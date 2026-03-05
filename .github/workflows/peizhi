@@ -1,0 +1,95 @@
+name: Build PaddleOCR from Scratch (Guaranteed x86_64)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-ocr:
+    runs-on: ubuntu-latest # 强制使用 x86_64 环境
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Create Dockerfile
+        run: |
+          cat << 'EOF' > Dockerfile
+          # 使用标准的 Python 3.9 基础镜像 (amd64)
+          FROM python:3.9-slim-bullseye
+
+          # 设置工作目录
+          WORKDIR /app
+
+          # 安装系统依赖 (PaddleOCR 需要 libgl1, libgomp1 等)
+          RUN apt-get update && apt-get install -y --no-install-recommends \
+              libgl1-mesa-glx \
+              libgomp1 \
+              libsm6 \
+              libxext6 \
+              libxrender-dev \
+              wget \
+              git \
+              && rm -rf /var/lib/apt/lists/*
+
+          # 安装 PaddlePaddle (CPU版) 和 PaddleOCR
+          # 使用国内源加速下载
+          RUN pip install --no-cache-dir -i https://pypi.tuna.tsinghua.edu.cn/simple \
+              paddlepaddle==2.6.0 \
+              paddleocr==2.7.0.3 \
+              flask \
+              pillow \
+              opencv-python-headless
+
+          # 创建简单的 Flask 启动脚本
+          RUN echo '\
+          from flask import Flask, request, jsonify\n\
+          from paddleocr import PaddleOCR\n\
+          import base64\n\
+          import numpy as np\n\
+          from PIL import Image\n\
+          import io\n\
+          \n\
+          app = Flask(__name__)\n\
+          ocr = PaddleOCR(use_angle_cls=True, lang="ch", show_log=False)\n\
+          \n\
+          @app.route("/ocr", methods=["POST"])\n\
+          def ocr_route():\n\
+              if "image" not in request.files:\n\
+                  return jsonify({"error": "No image provided"}), 400\n\
+              img_file = request.files["image"]\n\
+              img_bytes = img_file.read()\n\
+              image = Image.open(io.BytesIO(img_bytes)).convert("RGB")\n\
+              result = ocr.ocr(np.array(image), cls=True)\n\
+              \n\
+              texts = []\n\
+              if result and result[0]:\n\
+                  for line in result[0]:\n\
+                      texts.append(line[1][0])\n\
+              \n\
+              return jsonify({"text": texts})\n\
+          \n\
+          if __name__ == "__main__":\n\
+              app.run(host="0.0.0.0", port=8866)\n\
+          ' > app.py
+
+          # 暴露端口
+          EXPOSE 8866
+
+          # 启动命令
+          CMD ["python3", "app.py"]
+          EOF
+
+      - name: Build Docker Image
+        run: |
+          docker build -t jonathanzzh/paddleocr-http-server:latest .
+
+      - name: Save Image to Tar
+        run: |
+          docker save -o paddleocr-built-from-scratch.tar jonathanzzh/paddleocr-http-server:latest
+          ls -lh paddleocr-built-from-scratch.tar
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: paddleocr-self-built-x86
+          path: paddleocr-built-from-scratch.tar
+          retention-days: 1
