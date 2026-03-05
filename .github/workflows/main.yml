@@ -1,15 +1,50 @@
-name: Download Docker Image to Tar
+name: Download PaddleOCR Image (Multi-Source)
 
 on:
-  workflow_dispatch: # 允许手动触发
+  workflow_dispatch:
 
 jobs:
-  build:
+  download:
     runs-on: ubuntu-latest
     steps:
-      - name: Pull Docker Image
+      - name: Checkout
+        uses: actions/checkout@v3
+
+      - name: Try pulling from multiple sources
         run: |
-          docker pull jonathanzzh/paddleocr-http-server:latest
+          set -e
+          IMAGE_NAME="paddleocr-http-server"
+          TAG="latest"
+          FOUND_IMAGE=""
+
+          # 候选镜像列表
+          IMAGES=(
+            "cjh0613/paddleocr-http-server:latest"
+            "swr.cn-east-3.myhuaweicloud.com/ddn-k8s/docker.io/jonathanzzh/paddleocr-http-server:latest"
+            "registry.cn-hangzhou.aliyuncs.com/dify-ext/paddleocr-http-server:latest"
+            "python:3.10-slim" # 兜底，防止脚本直接报错退出，实际不会用这个
+          )
+
+          for img in "${IMAGES[@]}"; do
+            echo "Trying to pull: $img"
+            if docker pull "$img"; then
+              echo "Success! Found image: $img"
+              FOUND_IMAGE="$img"
+              # 重新打标签为原始名称，方便后续使用
+              docker tag "$img" "jonathanzzh/paddleocr-http-server:latest"
+              break
+            else
+              echo "Failed to pull: $img"
+            fi
+          done
+
+          if [ -z "$FOUND_IMAGE" ]; then
+            echo "❌ All images failed to pull."
+            exit 1
+          fi
+
+          # 保存成功的镜像
+          echo "Saving image: jonathanzzh/paddleocr-http-server:latest"
           docker save -o paddleocr-image.tar jonathanzzh/paddleocr-http-server:latest
           ls -lh paddleocr-image.tar
 
