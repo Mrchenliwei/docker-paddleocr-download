@@ -1,0 +1,29 @@
+name: Get Base Python Image for Local Build
+
+on:
+  workflow_dispatch:
+
+jobs:
+  get-base:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Pull Official Python Image
+        run: |
+          echo "Pulling official python:3.9-slim-bullseye (amd64)..."
+          # 强制拉取 amd64 版本，确保与您服务器架构一致
+          docker pull --platform linux/amd64 python:3.9-slim-bullseye
+          
+          echo "Tagging for local use..."
+          docker tag python:3.9-slim-bullseye my-local-ocr-base:latest
+          
+          echo "Saving to tar..."
+          docker save -o base-python-amd64.tar my-local-ocr-base:latest
+          
+          ls -lh base-python-amd64.tar
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: base-python-amd64
+          path: base-python-amd64.tar
+          retention-days: 1
