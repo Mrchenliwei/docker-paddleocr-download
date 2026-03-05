@@ -1,28 +1,29 @@
-name: Fix PaddleOCR (x86_64 Stable)
+name: Fix PaddleOCR (RapidOCR Stable)
 
 on:
   workflow_dispatch:
 
 jobs:
   build-and-upload:
-    runs-on: ubuntu-latest # 强制使用 x86_64 环境
+    runs-on: ubuntu-latest # 强制 x86_64 环境
     steps:
-      - name: Pull Correct Architecture Image
+      - name: Pull RapidOCR Image (Stable)
         run: |
-          echo "Pulling cjh0613/paddleocr-http-server:latest (Guaranteed x86_64)..."
-          docker pull cjh0613/paddleocr-http-server:latest
+          echo "Pulling iohub/onnxruntime-paddleocr:latest..."
+          # 这个镜像非常稳定，专门用于 HTTP 服务
+          docker pull iohub/onnxruntime-paddleocr:latest
           
-          echo "Retagging to jonathanzzh/paddleocr-http-server:latest for Dify compatibility..."
-          docker tag cjh0613/paddleocr-http-server:latest jonathanzzh/paddleocr-http-server:latest
+          echo "Retagging to jonathanzzh/paddleocr-http-server:latest for Dify..."
+          docker tag iohub/onnxruntime-paddleocr:latest jonathanzzh/paddleocr-http-server:latest
           
-          echo "Saving image to tarball..."
-          docker save -o paddleocr-fix.tar jonathanzzh/paddleocr-http-server:latest
+          echo "Saving image..."
+          docker save -o paddleocr-rapid-fix.tar jonathanzzh/paddleocr-http-server:latest
           
-          ls -lh paddleocr-fix.tar
+          ls -lh paddleocr-rapid-fix.tar
 
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: paddleocr-x86-fix
-          path: paddleocr-fix.tar
+          name: paddleocr-rapid-x86
+          path: paddleocr-rapid-fix.tar
           retention-days: 1
