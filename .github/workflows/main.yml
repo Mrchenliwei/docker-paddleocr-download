@@ -1,0 +1,21 @@
+name: Download Docker Image to Tar
+
+on:
+  workflow_dispatch: # 允许手动触发
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Pull Docker Image
+        run: |
+          docker pull jonathanzzh/paddleocr-http-server:latest
+          docker save -o paddleocr-image.tar jonathanzzh/paddleocr-http-server:latest
+          ls -lh paddleocr-image.tar
+
+      - name: Upload Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: paddleocr-offline-package
+          path: paddleocr-image.tar
+          retention-days: 1
